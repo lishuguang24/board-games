@@ -1,0 +1,15 @@
+# Render 蓝图：单个服务托管全部三个游戏 + 门户首页
+# 使用：把本目录推送到 GitHub → Render 控制台 New → Blueprint → 选择仓库 → Apply
+# 部署完成后得到一个固定网址，例如 https://board-games-portal.onrender.com
+#   /          门户首页
+#   /ttt/      二阶井字棋
+#   /othello/  黑白棋
+#   /quoridor/ 墙棋
+services:
+  - type: web
+    name: board-games-portal
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node portal-server.js
+    healthCheckPath: /healthz
