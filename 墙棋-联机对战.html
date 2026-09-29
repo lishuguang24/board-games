@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>墙棋 Quoridor · 双人对战平台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#070b18; --card:#121b38; --line:#26335a;
+  --text:#dbe4f5; --dim:#8fa0c5; --accent:#818cf8;
+  --win:#34d399; --danger:#f87171;
+  --blue:#60a5fa; --orange:#fbbf24;
+}
+body{
+  min-height:100vh;
+  background:radial-gradient(1100px 650px at 18% -10%, #17234c 0%, var(--bg0) 60%);
+  color:var(--text);
+  font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;
+}
+button,input,select{font-family:inherit}
+button{cursor:pointer;transition:.15s}
+button:disabled{opacity:.4;cursor:not-allowed}
+#lobby{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.lobbyCard{width:440px;max-width:96vw;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px 30px}
+.lobbyCard h1{font-size:24px;letter-spacing:1px;margin-bottom:6px}
+.lobbyCard .sub{color:var(--dim);font-size:13px;line-height:1.8;margin-bottom:20px}
+.lobbyCard label{display:block;color:var(--dim);font-size:13px;margin:12px 0 6px}
+.lobbyCard input{width:100%;background:#0d1430;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:15px}
+.lobbyCard input:focus{outline:1px solid var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover:not(:disabled){background:#6d78f0}
+.big{width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0d1430;color:var(--text);font-size:15px;margin-top:10px}
+.big:hover:not(:disabled){border-color:var(--accent)}
+.big.tut{border-color:#f59e0b;color:#fcd34d}
+.big.tut:hover{background:#2a2210}
+.or{color:#5b6b90;font-size:12px;text-align:center;margin:16px 0 4px}
+.joinRow{display:flex;gap:10px}
+.joinRow input{flex:1;letter-spacing:6px;text-align:center;font-size:18px}
+.joinRow button{width:110px;margin-top:10px;padding:10px;border-radius:9px;border:1px solid var(--line);background:#0d1430;color:var(--text);font-size:15px}
+#lobbyStatus{min-height:20px;margin-top:14px;font-size:13px;color:var(--danger)}
+#lobbyStatus.ok{color:var(--win)}
+.lobbyCard details{margin-top:16px}
+.lobbyCard summary{cursor:pointer;color:#b9c6e8;font-size:13px}
+.lobbyCard details p{color:var(--dim);font-size:12px;line-height:1.9;margin-top:8px}
+.lobbyCard details b{color:var(--text)}
+
+#game{padding-bottom:26px}
+#topbar{max-width:1060px;margin:0 auto;padding:14px 16px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#roomTag{font-size:16px;font-weight:700;letter-spacing:1px}
+#topbar .grow{flex:1}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.ok{background:var(--win);box-shadow:0 0 6px var(--win)}
+.dot.off{background:#64748b}
+#connText{color:var(--dim);font-size:13px}
+#topbar button{background:#0d1430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13px}
+#topbar button:hover:not(:disabled){border-color:var(--accent)}
+main{max-width:1060px;margin:10px auto 0;padding:0 12px;display:flex;gap:22px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+
+#boardWrap{position:relative;width:560px;flex:0 0 auto}
+#board{display:grid;grid-template-columns:repeat(9,54px);gap:4px;background:#0e1630;border:2px solid var(--line);border-radius:16px;padding:12px}
+.cell{width:54px;height:54px;background:#152142;border:1px solid #1f2a4d;border-radius:7px;position:relative;display:flex;align-items:center;justify-content:center;transition:background .12s}
+.cell.legal{cursor:pointer}
+.cell.legal::after{content:'';width:14px;height:14px;border-radius:50%;background:rgba(129,140,248,.35);position:absolute}
+.cell.legal:hover{background:#1d2a58}
+.cell.legal:hover::after{background:rgba(129,140,248,.7)}
+.cell.last{box-shadow:inset 0 0 0 3px #f472b6}
+.cell.goalUp{background:rgba(96,165,250,.10)}
+.cell.goalDown{background:rgba(251,191,36,.08)}
+.pawn{width:38px;height:38px;border-radius:50%;box-shadow:0 3px 7px rgba(0,0,0,.55)}
+.pawn.p0{background:radial-gradient(circle at 35% 30%, #93c5fd, #1d4ed8 75%);border:2px solid #dbeafe}
+.pawn.p1{background:radial-gradient(circle at 35% 30%, #fde68a, #b45309 75%);border:2px solid #fef3c7}
+.pawn.pop{animation:pop .3s ease}
+@keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
+#wallLayer{position:absolute;inset:0;pointer-events:none;z-index:5}
+.wall{position:absolute;background:linear-gradient(180deg,#475569,#1e293b);border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.6), inset 0 0 0 1px rgba(148,163,184,.25)}
+.wall.ghost{opacity:.45}
+.wall.ghost.bad{background:#7f1d1d;opacity:.6}
+#banner{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(7,11,24,.82);backdrop-filter:blur(3px);z-index:30;border-radius:16px;text-align:center}
+#banner.show{display:flex}
+#bannerTitle{font-size:32px;font-weight:700}
+#bannerSub{font-size:15px;color:var(--dim)}
+#banner button{padding:9px 22px;border-radius:9px;font-size:15px;border:1px solid var(--line);background:#0d1430;color:var(--text)}
+#banner button.primary{background:var(--accent);border-color:var(--accent)}
+
+#panel{width:350px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+.card h3{font-size:14px;color:#b9c6e8;margin-bottom:10px;letter-spacing:1px}
+.seat{display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:7px}
+.chip{width:20px;height:20px;border-radius:50%;flex:0 0 auto}
+.chip.p0{background:radial-gradient(circle at 35% 30%, #93c5fd, #1d4ed8 75%);border:1px solid #dbeafe}
+.chip.p1{background:radial-gradient(circle at 35% 30%, #fde68a, #b45309 75%);border:1px solid #fef3c7}
+.seat .me{color:var(--accent);font-size:12px}
+.seat .off{color:#64748b;font-size:12px}
+.seat .walls{margin-left:auto;color:var(--dim);font-size:12px}
+#specLine{margin-bottom:4px}
+#statusText{font-size:14px;margin:8px 0 4px}
+#distText{color:var(--dim);font-size:12px;margin-bottom:4px}
+.dimtext{color:var(--dim);font-size:12px;line-height:1.7;word-break:break-all}
+.evalLabels{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 5px;font-size:12px;color:var(--dim)}
+.evalLabels .ex{color:var(--blue);font-weight:700;font-size:13px}
+.evalLabels .eo{color:var(--orange);font-weight:700;font-size:13px}
+.evalbar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:#0b1226}
+.evalbar .sb{background:var(--blue);transition:width .4s}
+.evalbar .sw{background:var(--orange);flex:1}
+#evalTag{margin-top:5px;color:var(--win);font-size:12px;min-height:18px}
+.chatcard #chatList{height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;margin-bottom:10px}
+.msg{font-size:13px;line-height:1.55;word-break:break-all}
+.msg .t{color:#5b6b90;font-size:11px;margin-right:6px}
+.msg .n{color:var(--accent);margin-right:4px}
+.msg.mine .n{color:var(--win)}
+.msg.sys{color:#7e8db3;font-size:12px;font-style:italic}
+.chatcard form{display:flex;gap:8px}
+.chatcard input{flex:1;min-width:0;background:#0d1430;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.chatcard form button{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:0 16px;font-size:13px}
+.movelist{height:88px;overflow-y:auto;font-size:12px;color:var(--dim);line-height:2.0}
+.movelist .mv{display:inline-block;margin-right:12px;white-space:nowrap}
+.seg{display:flex;gap:6px;margin-top:9px}
+.seg button{flex:1;padding:8px 0;border-radius:8px;border:1px solid var(--line);background:#0d1430;color:var(--dim);font-size:13px}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.seg button:hover:not(:disabled):not(.on){border-color:var(--accent);color:var(--text)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.btns2{display:flex;gap:8px;margin-top:9px}
+.btns2 button{flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0d1430;color:var(--text);font-size:13px;white-space:nowrap}
+.btns2 button:hover:not(:disabled){border-color:var(--accent)}
+.btns2 .danger:hover:not(:disabled){border-color:var(--danger);color:var(--danger)}
+.emotes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.emotes button{padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:#0d1430;color:var(--dim);font-size:12px}
+.emotes button:hover{color:var(--text);border-color:var(--accent)}
+.cell.hint{animation:hintPulse .9s ease-in-out 3}
+@keyframes hintPulse{0%,100%{box-shadow:inset 0 0 0 2px #fbbf24}50%{box-shadow:inset 0 0 0 4px #fbbf24,0 0 14px #fbbf24}}
+
+/* 教程 */
+#tutCard{border:1px solid #f59e0b;background:#1a1a2e}
+#tutCard h3{color:#fcd34d}
+#tutText{font-size:13px;line-height:1.9;color:var(--text);margin-bottom:10px}
+#tutStep{color:#f59e0b;font-size:12px;margin-bottom:6px;font-weight:600}
+.tutbtns{display:flex;gap:8px}
+.tutbtns button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0d1430;color:var(--text);font-size:13px}
+.tutbtns button.primary{background:#f59e0b;border-color:#f59e0b;color:#1a1a2e;font-weight:700}
+
+#toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);background:#1c2854;border:1px solid var(--accent);border-radius:10px;padding:9px 18px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#errbanner{display:none;position:fixed;top:0;left:0;right:0;background:#7f1d1d;color:#fecaca;padding:8px 16px;font-size:13px;z-index:999}
+#inviteBox{display:none;position:fixed;inset:0;background:rgba(4,7,16,.7);z-index:60;align-items:center;justify-content:center}
+#inviteBox.show{display:flex}
+.inviteCard{width:430px;max-width:92vw;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+.inviteCard h3{margin-bottom:8px;font-size:16px}
+.inviteCard p{color:var(--dim);font-size:13px;line-height:1.8;margin-bottom:10px}
+.inviteCard input{width:100%;background:#0d1430;color:var(--win);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:13px;margin-bottom:12px}
+.inviteCard .row{display:flex;gap:10px;justify-content:flex-end}
+.inviteCard button{padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:#0d1430;color:var(--text);font-size:13px}
+.inviteCard button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (max-width:960px){#boardWrap{transform:scale(.86);transform-origin:top center}main{gap:8px}}
+</style>
+</head>
+<body>
+<div id="errbanner"></div>
+
+<!-- ========== 大厅 ========== -->
+<div id="lobby">
+  <div class="lobbyCard">
+    <h1>墙棋 Quoridor · 双人对战</h1>
+    <div class="sub">把棋子走到对面底线即胜，但要小心——对手可以用墙把你绕得晕头转向。支持远程对战、实时形势预测与新手引导。</div>
+    <label>你的昵称</label>
+    <input id="nameInput" maxlength="12" placeholder="例如：小明"/>
+    <button id="btnCreate" class="primary big">创建房间（执蓝先手，从底部出发）</button>
+    <div class="or">—— 或 —— 加入好友的房间（执橙后手）</div>
+    <div class="joinRow">
+      <input id="roomInput" maxlength="4" inputmode="numeric" placeholder="房间号"/>
+      <button id="btnJoin">加入</button>
+    </div>
+    <div class="or">—— 或 ——</div>
+    <button id="btnLocal" class="big">本机同屏对战</button>
+    <button id="btnTutorial" class="big tut">🎓 新手规则引导（强烈推荐首次游玩）</button>
+    <div id="lobbyStatus"></div>
+    <details>
+      <summary>快速规则（详细规则请进新手引导）</summary>
+      <p>
+        ① 9×9 棋盘，双方各 1 子，各 <b>10 面墙</b>；蓝方自底向上，橙方自顶向下，<b>先到达对方底线者胜</b>。<br>
+        ② 每回合二选一：<b>走子</b>（上下左右一格，紧贴对手可跳过/侧跳）或 <b>放墙</b>（横竖墙各占两格长）。<br>
+        ③ 墙不能重叠、不能交叉，<b>也不能把任何一方的通路完全堵死</b>。
+      </p>
+    </details>
+  </div>
+</div>
+
+<!-- ========== 对局 ========== -->
+<div id="game" style="display:none">
+  <div id="topbar">
+    <span id="roomTag">房间 ----</span>
+    <span class="dot ok" id="connDot"></span><span id="connText">已连接</span>
+    <span class="grow"></span>
+    <button id="btnSound">🔊 落子音</button>
+    <button id="btnInvite">复制邀请链接</button>
+    <button id="btnLeave">退出房间</button>
+  </div>
+  <main>
+    <div id="boardWrap">
+      <div id="board"></div>
+      <div id="wallLayer"></div>
+      <div id="banner">
+        <div id="bannerTitle"></div>
+        <div id="bannerSub"></div>
+        <button id="btnBannerRematch" class="primary">再战（交换先后手）</button>
+      </div>
+    </div>
+    <div id="panel">
+      <div class="card" id="tutCard" style="display:none">
+        <h3>🎓 新手引导</h3>
+        <div id="tutStep"></div>
+        <div id="tutText"></div>
+        <div class="tutbtns">
+          <button id="tutPrev">上一步</button>
+          <button id="tutNext" class="primary">下一步</button>
+          <button id="tutExit">退出</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>对局</h3>
+        <div class="seat" id="seat0"></div>
+        <div class="seat" id="seat1"></div>
+        <div id="specLine" class="dimtext"></div>
+        <div id="statusText"></div>
+        <div id="distText"></div>
+        <div class="evalLabels"><span class="ex" id="evalBText">蓝 50%</span><span>AI 形势预测</span><span class="eo" id="evalWText">50% 橙</span></div>
+        <div class="evalbar"><div class="sb" id="evalB" style="width:50%"></div><div class="sw"></div></div>
+        <div id="evalTag"></div>
+      </div>
+      <div class="card">
+        <h3>行动</h3>
+        <div class="seg" id="modeSeg">
+          <button id="modeMove" class="on">🚶 走子</button>
+          <button id="modeH">▬ 横墙</button>
+          <button id="modeV">▮ 竖墙</button>
+        </div>
+        <div class="btns2">
+          <button id="btnRematch" disabled>再战（交换先后手）</button>
+          <button id="btnResign" class="danger" disabled>认输</button>
+        </div>
+        <div class="btns2">
+          <button id="btnHint">提示</button>
+        </div>
+        <div class="emotes">
+          <button data-say="好墙！">好墙！</button>
+          <button data-say="这墙太狠了">这墙太狠了</button>
+          <button data-say="再来！">再来！</button>
+          <button data-say="👍">👍</button>
+          <button data-say="😅">😅</button>
+        </div>
+      </div>
+      <div class="card chatcard" id="chatCard">
+        <h3>聊天</h3>
+        <div id="chatList"></div>
+        <form id="chatForm">
+          <input id="chatInput" maxlength="300" placeholder="输入消息，回车发送…" autocomplete="off"/>
+          <button type="submit">发送</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>棋谱</h3>
+        <div id="moveList" class="movelist"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+<div id="inviteBox">
+  <div class="inviteCard">
+    <h3>邀请好友</h3>
+    <p>把下面的链接发给对方（同一局域网 / 已部署到云时可全球访问），或让对方记下房间号后在主页加入。</p>
+    <input id="inviteUrl" readonly/>
+    <div class="row">
+      <button id="btnInviteCopy" class="primary">复制链接</button>
+      <button id="btnInviteClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 游戏核心（服务器读取此段做权威判定与形势预测） ================= -->
+<script id="core">
+'use strict';
+/* 墙棋核心：9×9，双方各 1 子 10 墙；先到对方底线者胜 */
+class Quoridor {
+  constructor() {
+    this.pawns = [{ r: 8, c: 4 }, { r: 0, c: 4 }];   // 0=蓝(底,目标行0) 1=橙(顶,目标行8)
+    this.walls = [];                                  // {t:'H'|'V', r, c}  r,c ∈ 0..7
+    this.blockDown = new Set();                       // key: 禁止 (r,c)->(r+1,c)
+    this.blockRight = new Set();                      // key: 禁止 (r,c)->(r,c+1)
+    this.wallsLeft = [10, 10];
+    this.turn = 0;
+    this.over = false; this.winner = -1;
+    this.history = []; this.lastMove = null;
+  }
+  static key(r, c) { return r * 9 + c; }
+  clone() {
+    const g = new Quoridor();
+    g.pawns = this.pawns.map(p => ({ ...p }));
+    g.walls = this.walls.map(w => ({ ...w }));
+    g.blockDown = new Set(this.blockDown);
+    g.blockRight = new Set(this.blockRight);
+    g.wallsLeft = this.wallsLeft.slice();
+    g.turn = this.turn; g.over = this.over; g.winner = this.winner;
+    g.history = this.history.slice(); g.lastMove = this.lastMove ? { ...this.lastMove } : null;
+    return g;
+  }
+  static inb(r, c) { return r >= 0 && r < 9 && c >= 0 && c < 9; }
+  edgeOpen(r, c, dr, dc) {          // (r,c) 沿方向走一步是否未被墙挡（不含边界/棋子判断）
+    if (dr === 1) return !this.blockDown.has(Quoridor.key(r, c));
+    if (dr === -1) return !this.blockDown.has(Quoridor.key(r - 1, c));
+    if (dc === 1) return !this.blockRight.has(Quoridor.key(r, c));
+    if (dc === -1) return !this.blockRight.has(Quoridor.key(r, c - 1));
+    return true;
+  }
+  legalPawnMoves(side) {
+    const { r, c } = this.pawns[side], oppSide = 1 - side, out = [];
+    const opp = this.pawns[oppSide];
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (!Quoridor.inb(nr, nc) || !this.edgeOpen(r, c, dr, dc)) continue;
+      if (nr === opp.r && nc === opp.c) {
+        // 直跳：身后空且未挡
+        const jr = r + 2 * dr, jc = c + 2 * dc;
+        if (Quoridor.inb(jr, jc) && this.edgeOpen(nr, nc, dr, dc)) out.push({ r: jr, c: jc, kind: 'jump' });
+        else {
+          // 侧跳：对手身侧（沿垂直于 dr,dc 两个方向）
+          for (const [pr, pc] of dr === 0 ? [[-1, 0], [1, 0]] : [[0, -1], [0, 1]]) {
+            const sr = nr + pr, sc = nc + pc;
+            if (Quoridor.inb(sr, sc) && this.edgeOpen(nr, nc, pr, pc)) out.push({ r: sr, c: sc, kind: 'side' });
+          }
+        }
+      } else out.push({ r: nr, c: nc, kind: 'step' });
+    }
+    return out;
+  }
+  wallConflicts(t, r, c) {
+    if (t === 'H') {
+      if (this.blockDown.has(Quoridor.key(r, c)) || this.blockDown.has(Quoridor.key(r, c + 1))) return true;
+      return this.walls.some(w => w.t === 'V' && w.r === r && w.c === c);      // 交叉
+    } else {
+      if (this.blockRight.has(Quoridor.key(r, c)) || this.blockRight.has(Quoridor.key(r + 1, c))) return true;
+      return this.walls.some(w => w.t === 'H' && w.r === r && w.c === c);      // 交叉
+    }
+  }
+  addWall(t, r, c) {
+    this.walls.push({ t, r, c });
+    if (t === 'H') { this.blockDown.add(Quoridor.key(r, c)); this.blockDown.add(Quoridor.key(r, c + 1)); }
+    else { this.blockRight.add(Quoridor.key(r, c)); this.blockRight.add(Quoridor.key(r + 1, c)); }
+  }
+  removeWall(t, r, c) {
+    this.walls = this.walls.filter(w => !(w.t === t && w.r === r && w.c === c));
+    if (t === 'H') { this.blockDown.delete(Quoridor.key(r, c)); this.blockDown.delete(Quoridor.key(r, c + 1)); }
+    else { this.blockRight.delete(Quoridor.key(r, c)); this.blockRight.delete(Quoridor.key(r + 1, c)); }
+  }
+  bfsDist(side) {   // 到目标行的最短步数（忽略棋子，含墙）；不可达=999
+    const goal = side === 0 ? 0 : 8;
+    const start = this.pawns[side];
+    const seen = new Set([Quoridor.key(start.r, start.c)]);
+    let frontier = [[start.r, start.c]], d = 0;
+    while (frontier.length) {
+      const next = [];
+      for (const [r, c] of frontier) {
+        if (r === goal) return d;
+        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+          const nr = r + dr, nc = c + dc;
+          if (!Quoridor.inb(nr, nc)) continue;
+          if (!this.edgeOpen(r, c, dr, dc)) continue;
+          const k = Quoridor.key(nr, nc);
+          if (seen.has(k)) continue;
+          seen.add(k); next.push([nr, nc]);
+        }
+      }
+      frontier = next; d++;
+    }
+    return 999;
+  }
+  canPlaceWall(side, t, r, c) {
+    if (r < 0 || r > 7 || c < 0 || c > 7) return false;
+    if (this.wallsLeft[side] <= 0) return false;
+    if (this.wallConflicts(t, r, c)) return false;
+    this.addWall(t, r, c);
+    const ok = this.bfsDist(0) < 999 && this.bfsDist(1) < 999;
+    this.removeWall(t, r, c);
+    return ok;
+  }
+  act(side, action) {   // action: {kind:'move', r, c} | {kind:'wall', t, r, c}
+    if (this.over || side !== this.turn) return false;
+    if (action.kind === 'move') {
+      const legal = this.legalPawnMoves(side).find(m => m.r === action.r && m.c === action.c);
+      if (!legal) return false;
+      this.pawns[side] = { r: action.r, c: action.c };
+      this.lastMove = { kind: 'move', r: action.r, c: action.c };
+    } else {
+      if (!this.canPlaceWall(side, action.t, action.r, action.c)) return false;
+      this.addWall(action.t, action.r, action.c);
+      this.wallsLeft[side]--;
+      this.lastMove = { kind: action.t, r: action.r, c: action.c };
+    }
+    this.history.push({ side, ...action });
+    if (action.kind === 'move' && this.pawns[side].r === (side === 0 ? 0 : 8)) {
+      this.over = true; this.winner = side;
+    }
+    this.turn = 1 - side;
+    return true;
+  }
+  legalActions(side) {
+    const acts = this.legalPawnMoves(side).map(m => ({ kind: 'move', r: m.r, c: m.c }));
+    if (this.wallsLeft[side] > 0) {
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++)
+        for (const t of ['H', 'V'])
+          if (this.canPlaceWall(side, t, r, c)) acts.push({ kind: 'wall', t, r, c });
+    }
+    return acts;
+  }
+  toJSON() {
+    return { pawns: this.pawns, walls: this.walls, wallsLeft: this.wallsLeft, turn: this.turn,
+             over: this.over, winner: this.winner, lastMove: this.lastMove, history: this.history };
+  }
+  fromJSON(j) {
+    this.pawns = j.pawns.map(p => ({ ...p }));
+    this.walls = j.walls.map(w => ({ ...w }));
+    // 直接按墙的类型重建阻挡边集合（不能用 addWall：它有 push 副作用）
+    this.blockDown = new Set(); this.blockRight = new Set();
+    for (const w of this.walls) {
+      if (w.t === 'H') { this.blockDown.add(Quoridor.key(w.r, w.c)); this.blockDown.add(Quoridor.key(w.r, w.c + 1)); }
+      else { this.blockRight.add(Quoridor.key(w.r, w.c)); this.blockRight.add(Quoridor.key(w.r + 1, w.c)); }
+    }
+    this.wallsLeft = j.wallsLeft.slice();
+    this.turn = j.turn; this.over = j.over; this.winner = j.winner;
+    this.lastMove = j.lastMove ? { ...j.lastMove } : null;
+    this.history = j.history.slice();
+    return this;
+  }
+  counts() { return [this.wallsLeft[0], this.wallsLeft[1]]; }
+}
+
+/* ---------- 形势预测：BFS 路差 + 候选墙剪枝的浅层 alpha-beta ---------- */
+function qDist(g, side) { return g.bfsDist(side); }
+function qHeuristic(g) {   // 蓝方视角
+  const d0 = qDist(g, 0), d1 = qDist(g, 1);
+  if (d0 >= 999) return -500;
+  if (d1 >= 999) return 500;
+  let sc = (d1 - d0) * 10;
+  sc += 1.5 * (g.wallsLeft[0] - g.wallsLeft[1]);
+  return sc;
+}
+function qCandidateWalls(g, side, limit) {
+  // 只考察两枚棋子周边区域内的墙槽（路径剪枝，参考主流 Quoridor AI 做法）
+  const rows = [g.pawns[0].r, g.pawns[1].r], cols = [g.pawns[0].c, g.pawns[1].c];
+  const rMin = Math.max(0, Math.min(...rows) - 2), rMax = Math.min(7, Math.max(...rows) + 2);
+  const cMin = Math.max(0, Math.min(...cols) - 2), cMax = Math.min(7, Math.max(...cols) + 2);
+  const dOpp0 = qDist(g, 1 - side), dMe0 = qDist(g, side);
+  const cands = [];
+  for (let r = rMin; r <= rMax; r++) for (let c = cMin; c <= cMax; c++) {
+    for (const t of ['H', 'V']) {
+      if (g.wallConflicts(t, r, c)) continue;
+      g.addWall(t, r, c);
+      const dOpp = qDist(g, 1 - side), dMe = qDist(g, side);
+      g.removeWall(t, r, c);
+      if (dOpp >= 999 || dMe >= 999) continue;             // 会堵死，跳过
+      const gain = (dOpp - dOpp0) - 0.6 * (dMe - dMe0);
+      if (gain > 0) cands.push({ gain, t, r, c });
+    }
+  }
+  cands.sort((a, b) => b.gain - a.gain);
+  return cands.slice(0, limit).map(x => ({ kind: 'wall', t: x.t, r: x.r, c: x.c }));
+}
+function qActions(g, side, wallLimit) {
+  const acts = g.legalPawnMoves(side).map(m => ({ kind: 'move', r: m.r, c: m.c }));
+  if (wallLimit > 0 && g.wallsLeft[side] > 0) acts.push(...qCandidateWalls(g, side, wallLimit));
+  return acts;
+}
+function qApplyUndo(g, side, act) {
+  let undo;
+  if (act.kind === 'move') {
+    const old = g.pawns[side], oldOver = g.over, oldWinner = g.winner;
+    g.pawns[side] = { r: act.r, c: act.c };
+    if (act.r === (side === 0 ? 0 : 8)) { g.over = true; g.winner = side; }   // 终局判定
+    undo = () => { g.pawns[side] = old; g.over = oldOver; g.winner = oldWinner; };
+  } else {
+    g.addWall(act.t, act.r, act.c);
+    g.wallsLeft[side]--;
+    undo = () => { g.removeWall(act.t, act.r, act.c); g.wallsLeft[side]++; };
+  }
+  const oldTurn = g.turn;
+  g.turn = 1 - side;
+  return () => {
+    undo();
+    g.turn = oldTurn;
+  };
+}
+function qSearch(g, depth, alpha, beta, cnt) {
+  cnt.n++;
+  if (cnt.n > cnt.cap) { cnt.abort = true; return alpha; }
+  const side = g.turn;
+  if (g.over) return g.winner === 0 ? 1000 : g.winner === 1 ? -1000 : 0;
+  if (depth <= 0) return qHeuristic(g);
+  const acts = qActions(g, side, depth >= 2 ? 4 : 0);
+  if (!acts.length) return qHeuristic(g);
+  const maximizing = side === 0;
+  let best = maximizing ? -1e9 : 1e9;
+  for (const a of acts) {
+    const undo = qApplyUndo(g, side, a);
+    const v = qSearch(g, depth - 1, alpha, beta, cnt);
+    undo();
+    if (cnt.abort) return best;
+    if (maximizing) { if (v > best) best = v; if (best > alpha) alpha = best; }
+    else { if (v < best) best = v; if (best < beta) beta = best; }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function evalDetail(g) {
+  if (g.over) {
+    const tag = g.winner === 0 ? '终局：蓝方到达底线' : '终局：橙方到达底线';
+    return { pct: g.winner === 0 ? 100 : 0, tag };
+  }
+  const d0 = qDist(g, 0), d1 = qDist(g, 1);
+  if (d0 >= 999) return { pct: 0, tag: '蓝方已被完全封死' };
+  if (d1 >= 999) return { pct: 100, tag: '橙方已被完全封死' };
+  const sb = g.clone();
+  const cnt = { n: 0, cap: 6000, abort: false };
+  const score = qSearch(sb, 3, -1e9, 1e9, cnt);
+  // 评估分约等于 10×步差 + 1.5×墙差；K=40 使一步领先≈62%、两步≈73%、必胜≈99%
+  const K = 40;
+  const pct = Math.max(1, Math.min(99, Math.round(50 + 50 * Math.tanh(score / K))));
+  return { pct, tag: `预测 · 深度 3（评估 ${cnt.n} 节点）` };
+}
+function blackWinPct(g) { return evalDetail(g).pct; }
+function bestMoveHint(g) {
+  const side = g.turn;
+  const acts = qActions(g, side, 6);
+  if (!acts.length) return { move: null };
+  const cnt = { n: 0, cap: 9000, abort: false };
+  const maximizing = side === 0;
+  let best = maximizing ? -1e9 : 1e9, bestAct = acts[0];
+  let alpha = -1e9, beta = 1e9;
+  for (const a of acts) {
+    const undo = qApplyUndo(g, side, a);
+    const v = qSearch(g, 2, alpha, beta, cnt);
+    undo();
+    if (cnt.abort) break;
+    if (maximizing) { if (v > best) { best = v; bestAct = a; } if (best > alpha) alpha = best; }
+    else { if (v < best) best = v; if (best < beta) beta = best; }
+  }
+  return { move: bestAct, score: best };
+}
+const QLEVELS = {};
+</script>
+
+<!-- ================= 界面与交互 ================= -->
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const CELL = 54, GAP = 4, OFF = 12, PITCH = CELL + GAP;
+const coordQ = (r, c) => String.fromCharCode(97 + c) + (r + 1);
+
+let sid = sessionStorage.getItem('q_sid');
+if (!sid) { sid = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem('q_sid', sid); }
+
+const app = {
+  offline: false,
+  tutorial: false,
+  name: sessionStorage.getItem('q_name') ?? localStorage.getItem('q_name') ?? '',
+  room: null, pid: null, role: null, mySide: 0,
+  seats: [null, null], specCount: 0,
+  state: new Quoridor(),
+  rematchVotes: [],
+  es: null,
+  mode: 'move',          // move | H | V
+  hover: null,
+};
+
+/* ---------- 棋盘 DOM ---------- */
+const cellEls = [];
+function buildBoard() {
+  const board = $('board');
+  for (let i = 0; i < 81; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.i = i;
+    if (((i / 9) | 0) === 0) cell.classList.add('goalUp');
+    if (((i / 9) | 0) === 8) cell.classList.add('goalDown');
+    board.appendChild(cell);
+    cellEls.push(cell);
+  }
+  board.addEventListener('click', e => {
+    const t = e.target.closest('.cell');
+    if (!t) return;
+    const r = ((+t.dataset.i) / 9) | 0, c = (+t.dataset.i) % 9;
+    onCellClick(r, c);
+  });
+  board.addEventListener('mousemove', e => {
+    const t = e.target.closest('.cell');
+    if (!t) return;
+    const r = ((+t.dataset.i) / 9) | 0, c = (+t.dataset.i) % 9;
+    if (!app.hover || app.hover.r !== r || app.hover.c !== c) {
+      app.hover = { r, c };
+      renderWalls();
+    }
+  });
+  board.addEventListener('mouseleave', () => { app.hover = null; renderWalls(); });
+}
+function cellAt(r, c) { return cellEls[r * 9 + c]; }
+
+/* ---------- 渲染 ---------- */
+let audioCtx = null;
+let soundOn = localStorage.getItem('q_sound') !== '0';
+function playSound() {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = 380 + Math.random() * 120;
+    g.gain.setValueAtTime(0.07, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + 0.16);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.17);
+  } catch (e) {}
+}
+function isMyTurn() {
+  if (app.state.over) return false;
+  if (app.offline || app.tutorial) return true;
+  return app.role === 'player' && app.state.turn === app.mySide;
+}
+function render() {
+  const g = app.state;
+  const myTurn = isMyTurn();
+  let legalSet = null, hintSet = null;
+  if (app.tutorial) {
+    legalSet = new Set(g.legalPawnMoves(g.turn).map(m => m.r * 9 + m.c));
+    const hl = TUT_STEPS[app.tutStep].highlight;
+    if (hl) hintSet = new Set((hl(g) || []).map(x => x.r * 9 + x.c));
+  } else if (myTurn && (app.mode === 'move' || app.tutorial)) {
+    legalSet = new Set(g.legalPawnMoves(g.turn).map(m => m.r * 9 + m.c));
+  }
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const cell = cellAt(r, c);
+    const pawnHere = (g.pawns[0].r === r && g.pawns[0].c === c) ? 0 : (g.pawns[1].r === r && g.pawns[1].c === c) ? 1 : -1;
+    const key = 'p' + pawnHere;
+    if (cell.dataset.v !== key) {
+      const had = cell.dataset.v !== undefined && pawnHere >= 0;
+      cell.dataset.v = key;
+      cell.innerHTML = pawnHere >= 0 ? `<div class="pawn p${pawnHere}${had ? ' pop' : ''}"></div>` : '';
+    }
+    let isLegal = false, isHint = false;
+    if (app.tutorial) {
+      if (legalSet && legalSet.has(r * 9 + c) && (hintSet === null || hintSet.has(r * 9 + c))) isLegal = true;
+      if (hintSet && hintSet.has(r * 9 + c)) { isLegal = true; isHint = true; }
+    } else if (myTurn && app.mode === 'move') {
+      isLegal = !!(legalSet && legalSet.has(r * 9 + c));
+    }
+    cell.classList.toggle('legal', isLegal);
+    cell.classList.toggle('hint', isHint);
+    cell.classList.toggle('last', !!g.lastMove && g.lastMove.kind === 'move' && g.lastMove.r === r && g.lastMove.c === c);
+  }
+  renderWalls();
+  updateScore();
+  updateMoveList();
+  updateStatus();
+  updateButtons();
+}
+function renderWalls() {
+  const layer = $('wallLayer');
+  layer.innerHTML = '';
+  const g = app.state;
+  const draw = (t, r, c, ghost, bad) => {
+    const d = document.createElement('div');
+    d.className = 'wall' + (ghost ? ' ghost' : '') + (bad ? ' bad' : '');
+    if (t === 'H') {
+      d.style.left = (OFF + c * PITCH) + 'px';
+      d.style.top = (OFF + (r + 1) * PITCH - 5) + 'px';
+      d.style.width = (CELL * 2 + GAP) + 'px';
+      d.style.height = '10px';
+    } else {
+      d.style.left = (OFF + (c + 1) * PITCH - 5) + 'px';
+      d.style.top = (OFF + r * PITCH) + 'px';
+      d.style.width = '10px';
+      d.style.height = (CELL * 2 + GAP) + 'px';
+    }
+    layer.appendChild(d);
+  };
+  for (const w of g.walls) draw(w.t, w.r, w.c, false, false);
+  // 幽灵预览
+  if (!app.tutorial && isMyTurn() && app.role === 'player' && app.mode !== 'move' && app.hover) {
+    const { r, c } = app.hover;
+    const ok = g.canPlaceWall(app.mySide, app.mode, r, c);
+    if (g.wallsLeft[app.mySide] > 0) draw(app.mode, r, c, true, !ok);
+  }
+  if (app.tutorial) {
+    const step = TUT_STEPS[app.tutStep];
+    if (step.ghostWall) {
+      const w = step.ghostWall(g);
+      if (w) draw(w.t, w.r, w.c, true, !w.ok);
+    }
+  }
+}
+function updateScore() {
+  const g = app.state;
+  const d0 = g.bfsDist(0), d1 = g.bfsDist(1);
+  $('distText').textContent = `蓝距终点 ${d0 >= 999 ? '—' : d0} 步 · 橙距终点 ${d1 >= 999 ? '—' : d1} 步`;
+}
+function updateEval(pct) {
+  pct = Math.max(0, Math.min(100, pct | 0));
+  $('evalB').style.width = pct + '%';
+  $('evalBText').textContent = '蓝 ' + pct + '%';
+  $('evalWText').textContent = (100 - pct) + '% 橙';
+}
+function seatView(el, p, side) {
+  el.innerHTML = '';
+  const chip = document.createElement('span');
+  chip.className = 'chip p' + side;
+  el.appendChild(chip);
+  if (p) {
+    const nm = document.createElement('span');
+    nm.textContent = (p.bot ? '🤖 ' : '') + p.name;
+    el.appendChild(nm);
+    if (!p.bot && p.side - 1 === app.mySide && app.role === 'player' && !app.offline && !app.tutorial) {
+      const me = document.createElement('span'); me.className = 'me'; me.textContent = '（你）'; el.appendChild(me);
+    }
+    if (!p.bot && !p.online) {
+      const off = document.createElement('span'); off.className = 'off'; off.textContent = '离线'; el.appendChild(off);
+    }
+    const wl = document.createElement('span'); wl.className = 'walls';
+    wl.textContent = `墙 ×${app.state.wallsLeft[side]}`;
+    el.appendChild(wl);
+  } else {
+    const nm = document.createElement('span');
+    nm.style.color = '#64748b'; nm.textContent = '等待玩家加入…';
+    el.appendChild(nm);
+  }
+}
+function otherPlayer() { return app.seats[0] && app.seats[1]; }
+function otherName() {
+  const i = app.mySide === 0 ? 1 : 0;
+  return app.seats[i] ? app.seats[i].name : '对手';
+}
+function updateStatus() {
+  const g = app.state;
+  seatView($('seat0'), app.seats[0], 0);
+  seatView($('seat1'), app.seats[1], 1);
+  $('specLine').textContent = app.specCount > 0 ? `${app.specCount} 人观战中` : '';
+  const st = $('statusText');
+  if (app.tutorial) st.textContent = '引导模式：按右侧提示操作';
+  else if (app.role === 'spec') st.textContent = '房间已满，你以观战身份进入';
+  else if (g.over) st.textContent = '对局结束';
+  else {
+    const mover = app.state.turn === 0 ? '蓝' : '橙';
+    if (app.offline) st.textContent = `轮到${mover}方行动`;
+    else if (!otherPlayer()) st.textContent = '等待对手加入…';
+    else if (isMyTurn()) st.textContent = `轮到你（${mover}方）行动`;
+    else st.textContent = `等待 ${otherName()}（${mover}方）行动…`;
+  }
+}
+function updateButtons() {
+  const over = app.state.over;
+  const iVoted = app.rematchVotes.includes(app.mySide);
+  $('btnResign').disabled = over || app.offline || app.tutorial || app.role !== 'player' || !otherPlayer();
+  const canRematch = app.tutorial || app.offline ? !over : over && app.role === 'player' && !iVoted;
+  $('btnRematch').disabled = !canRematch;
+  $('btnRematch').textContent = (!app.tutorial && !app.offline && over)
+    ? (iVoted ? '已同意，等待对方…' : (app.rematchVotes.length ? '对方想再战！点击应战' : '再战（交换先后手）'))
+    : '再战（交换先后手）';
+  $('btnBannerRematch').style.display = (over && (app.offline || app.tutorial || app.role === 'player')) ? '' : 'none';
+  $('btnBannerRematch').disabled = !app.offline && !app.tutorial && app.rematchVotes.includes(app.mySide);
+  const mySideNow = app.tutorial ? 0 : (app.offline ? app.state.turn : app.mySide);
+  const wallOK = isMyTurn() && app.state.wallsLeft[mySideNow] > 0;
+  $('modeH').disabled = !wallOK;
+  $('modeV').disabled = !wallOK;
+  $('modeMove').disabled = !isMyTurn();
+  $('btnHint').disabled = over || app.tutorial;
+}
+function mySide() { return app.offline || app.tutorial ? app.state.turn : app.mySide; }
+function maybeBanner() {
+  const g = app.state;
+  if (!g.over) { $('banner').classList.remove('show'); return; }
+  const bt = $('bannerTitle'), bs = $('bannerSub');
+  bs.textContent = g.lastMove && g.lastMove.kind !== 'move' ? '（凭墙取胜？不，是走到了对面底线）' : '';
+  if (app.tutorial) { bt.textContent = `${g.winner === 0 ? '蓝' : '橙'}方获胜！`; }
+  else if (app.offline) bt.textContent = `${g.winner === 0 ? '蓝' : '橙'}方获胜！`;
+  else if (app.role === 'player') {
+    bt.textContent = g.winner === app.mySide ? '🎉 你赢了！' : '😢 你输了';
+  } else bt.textContent = `${g.winner === 0 ? '蓝' : '橙'}方获胜！`;
+  $('banner').classList.add('show');
+}
+function updateMoveList() {
+  const h = app.state.history, list = $('moveList');
+  list.innerHTML = '';
+  for (let i = 0; i < h.length; i++) {
+    const sp = document.createElement('span');
+    sp.className = 'mv';
+    const a = h[i];
+    const who = a.side === 0 ? '蓝' : '橙';
+    const what = a.kind === 'move' ? coordQ(a.r, a.c)
+      : (a.t === 'H' ? '横墙' + coordQ(a.r, a.c) : '竖墙' + coordQ(a.r, a.c));
+    sp.textContent = (i + 1) + '.' + who + what;
+    list.appendChild(sp);
+  }
+  list.scrollTop = list.scrollHeight;
+}
+
+/* ---------- 聊天 ---------- */
+function addChatLine(d) {
+  const list = $('chatList');
+  const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  const div = document.createElement('div');
+  div.className = 'msg' + (d.sys ? ' sys' : '') + (!d.sys && d.name === app.name ? ' mine' : '');
+  if (d.sys) div.textContent = d.text;
+  else {
+    const t = document.createElement('span');
+    const time = d.ts ? new Date(d.ts) : new Date();
+    t.className = 't';
+    t.textContent = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+    const n = document.createElement('span');
+    n.className = 'n'; n.textContent = d.name + '：';
+    const x = document.createElement('span'); x.textContent = d.text;
+    div.append(t, n, x);
+  }
+  list.appendChild(div);
+  while (list.children.length > 200) list.removeChild(list.firstChild);
+  if (nearBottom) list.scrollTop = list.scrollHeight;
+}
+
+/* ---------- 网络 ---------- */
+async function postJSON(url, data) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function applyState(d) {
+  app.state = new Quoridor().fromJSON(d.state);
+  app.rematchVotes = d.rematchVotes || [];
+  if (app.state.history.length === 0 && app.mode !== 'move') {
+    app.mode = 'move';   // 新开局重置为走子模式，避免墙模式残留
+    $('modeMove').classList.add('on');
+    $('modeH').classList.remove('on');
+    $('modeV').classList.remove('on');
+  }
+  render(); maybeBanner();
+}
+function onCellClick(r, c) {
+  const g = app.state;
+  if (g.over) return;
+  if (app.tutorial) return tutClick(r, c);
+  const mode = app.mode;   // 走子/横墙/竖墙模式对同屏与联机一视同仁
+  if (!isMyTurn()) return toast('还没轮到你');
+  if (app.role !== 'player' && !app.offline) return toast('观战模式下不能操作');
+  if (mode === 'move') {
+    const act = { kind: 'move', r, c };
+    if (app.offline) return localAct(act);
+    postJSON('api/move', { room: app.room, pid: app.pid, action: act }).catch(e => toast('操作失败：' + e.message));
+  } else {
+    const act = { kind: 'wall', t: mode, r, c };
+    if (!g.canPlaceWall(mySide(), act.t, act.r, act.c)) return toast('这里不能放墙（重叠/交叉/会堵死通路）');
+    if (app.offline) return localAct(act);
+    postJSON('api/move', { room: app.room, pid: app.pid, action: act }).catch(e => toast('操作失败：' + e.message));
+  }
+}
+function localAct(act) {
+  const g = app.state;
+  if (!g.act(mySide(), act)) return toast('非法操作');
+  playSound();
+  render();
+  if (g.over) maybeBanner();
+  else {
+    const d = evalDetail(g);
+    updateEval(d.pct); $('evalTag').textContent = d.tag;
+  }
+}
+function openStream(room, name) {
+  if (app.es) app.es.close();
+  const es = new EventSource(`events?room=${room}&name=${encodeURIComponent(name)}&sid=${encodeURIComponent(sid)}`);
+  app.es = es;
+  es.addEventListener('hello', e => {
+    const d = JSON.parse(e.data);
+    app.room = room; app.pid = d.pid; app.role = d.role;
+    app.mySide = d.side > 0 ? d.side - 1 : -1;   // 协议座位列 1/2，核心行棋方 0/1
+    applyRoom(d.seats, d.specCount);
+    applyState({ state: d.state, rematchVotes: d.rematchVotes });
+    $('chatList').innerHTML = '';
+    for (const c of d.chat) addChatLine(c);
+    updateEval(d.evalPct ?? 50);
+    $('evalTag').textContent = d.evalTag || '';
+    $('lobby').style.display = 'none';
+    $('game').style.display = '';
+    $('roomTag').textContent = '房间 ' + room;
+    // 恢复教程/同屏模式隐藏过的界面元素
+    $('chatCard').style.display = '';
+    $('btnInvite').style.display = '';
+    $('connDot').style.display = '';
+    sessionStorage.setItem('q_lastroom', room);
+    setConn(true);
+  });
+  es.addEventListener('state', e => {
+    const d = JSON.parse(e.data);
+    applyState(d);
+    updateEval(d.evalPct ?? 50);
+    $('evalTag').textContent = d.evalTag || '';
+  });
+  es.addEventListener('room', e => {
+    const d = JSON.parse(e.data);
+    applyRoom(d.seats, d.specCount, d.yourSide);
+    render();
+  });
+  es.addEventListener('chat', e => { addChatLine(JSON.parse(e.data)); });
+  es.addEventListener('eval', e => { updateEval(JSON.parse(e.data).blue); });
+  es.addEventListener('rematch', e => {
+    const d = JSON.parse(e.data);
+    app.rematchVotes = d.votes || [];
+    render();
+  });
+  es.addEventListener('fatal', e => {
+    const d = JSON.parse(e.data);
+    es.close(); app.es = null;
+    sessionStorage.removeItem('q_lastroom');
+    backToLobby(d.reason || '无法加入房间');
+  });
+  es.onopen = () => setConn(true);
+  es.onerror = () => setConn(false);
+}
+function applyRoom(seats, specCount, yourSide) {
+  app.seats = seats; app.specCount = specCount;
+  if (yourSide) app.mySide = yourSide - 1;   // 再战换边后服务器下发新执子方（协议 1/2 → 核心 0/1）
+}
+function setConn(ok) {
+  $('connDot').className = 'dot ' + (ok ? 'ok' : 'off');
+  $('connText').textContent = ok ? '已连接' : '连接断开，自动重连中…';
+}
+
+/* ---------- 大厅 / 房间 ---------- */
+async function createRoom() {
+  const name = getName();
+  lobbyStatus('正在创建房间…', true);
+  try {
+    const j = await postJSON('api/join', { name, create: true, sid });
+    openStream(j.room, name);
+  } catch (e) { lobbyStatus('创建失败：' + e.message); }
+}
+async function joinRoom() {
+  const name = getName();
+  const room = $('roomInput').value.trim();
+  if (!/^\d{4}$/.test(room)) return lobbyStatus('请输入 4 位房间号');
+  lobbyStatus('正在加入…', true);
+  try {
+    await postJSON('api/join', { name, room, sid });
+    openStream(room, name);
+  } catch (e) { lobbyStatus('加入失败：' + e.message); }
+}
+function getName() {
+  const typed = $('nameInput').value.trim();
+  const name = typed || app.name || '玩家';
+  app.name = name;
+  sessionStorage.setItem('q_name', name);
+  localStorage.setItem('q_name', name);
+  return name;
+}
+function lobbyStatus(msg, ok) {
+  const el = $('lobbyStatus');
+  el.textContent = msg; el.className = ok ? 'ok' : '';
+}
+function backToLobby(reason) {
+  if (app.es) { app.es.close(); app.es = null; }
+  app.offline = false; app.tutorial = false;
+  $('tutCard').style.display = 'none';
+  app.room = null; app.pid = null; app.role = null; app.mySide = 0;
+  app.seats = [null, null]; app.state = new Quoridor(); app.rematchVotes = [];
+  setMode('move'); app.hover = null;   // 清理模式与悬停残留
+  updateEval(50); $('evalTag').textContent = '';
+  $('game').style.display = 'none';
+  $('banner').classList.remove('show');
+  $('lobby').style.display = '';
+  lobbyStatus(reason || '');
+}
+function startOffline() {
+  app.offline = true; app.tutorial = false;
+  $('tutCard').style.display = 'none';
+  app.role = 'player'; app.mySide = 0;
+  app.name = getName();
+  app.seats = [{ name: '蓝方', online: true, side: 0 }, { name: '橙方', online: true, side: 1 }];
+  app.state = new Quoridor();
+  app.rematchVotes = [];
+  $('chatCard').style.display = 'none';
+  $('btnInvite').style.display = 'none';
+  $('connDot').style.display = 'none';
+  $('connText').textContent = '本机对局';
+  $('roomTag').textContent = '同屏对战';
+  $('lobby').style.display = 'none';
+  $('game').style.display = '';
+  updateEval(50); $('evalTag').textContent = '';
+  render();
+  toast('同屏模式：两人轮流用同一设备行动');
+}
+function inviteUrl() { return location.origin + location.pathname + '?room=' + app.room; }
+function showInvite() { $('inviteUrl').value = inviteUrl(); $('inviteBox').classList.add('show'); }
+async function copyInvite() {
+  const url = inviteUrl();
+  try { await navigator.clipboard.writeText(url); toast('邀请链接已复制'); }
+  catch (e) { $('inviteUrl').select(); document.execCommand('copy'); toast('已复制（若未成功请手动复制）'); }
+}
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ---------- 新手引导 ---------- */
+const TUT_STEPS = [
+  {
+    title: '欢迎来到墙棋！',
+    text: '你要把<b>蓝色棋子</b>（底部）一路走到<b>对面顶行</b>；对手的橙色棋子则要走到你的底行。谁先到达谁赢。<br><br>点「下一步」学习怎么走子。',
+    setup(g) { resetStandard(g); },
+    highlight: null, ghostWall: null, validate: null, wantClick: 'next',
+  },
+  {
+    title: '第 1 课：走子',
+    text: '每回合可以<b>走一格</b>：上下左右，但不能斜走、不能穿墙。<br><br>现在轮到你——<b>点击任意发亮的格子</b>走一步。',
+    setup(g) { resetStandard(g); },
+    highlight: g => g.legalPawnMoves(0),
+    ghostWall: null, validate: null, wantClick: 'move',
+  },
+  {
+    title: '第 2 课：放墙',
+    text: '走子之外，你也可以<b>放一面墙</b>拖慢对手。墙长两格，横竖均可。<br><br>试着在<b>橙色棋子上方</b>放一面横墙——<b>点击虚影覆盖的任意格子</b>（橙色棋子上方的发亮横条）即可。',
+    setup(g) {
+      resetCustom(g, { me: { r: 6, c: 4 }, opp: { r: 3, c: 4 } });
+    },
+    highlight: null,
+    ghostWall: g => ({ t: 'H', r: 2, c: 3, ok: true }),
+    validate: a => a.kind === 'wall' && a.t === 'H' && a.r === 2 && a.c === 3 ? 'ok' : '试试在橙子上方放横墙（虚影位置）',
+    wantClick: 'wall',
+  },
+  {
+    title: '第 3 课：跳子',
+    text: '两子<b>紧贴</b>时可以直接<b>跳过</b>对手！现在你俩贴在一起——点击高亮格子，跳到对手身后。',
+    setup(g) { resetCustom(g, { me: { r: 6, c: 4 }, opp: { r: 5, c: 4 } }); },
+    highlight: g => [{ r: 4, c: 4 }],
+    ghostWall: null,
+    validate: a => a.kind === 'move' && a.r === 4 && a.c === 4 ? 'ok' : '点击对手身后的高亮格子完成跳子',
+    wantClick: 'move',
+  },
+  {
+    title: '第 4 课：侧跳',
+    text: '如果对手<b>身后被墙挡住</b>，跳不过去时可以<b>斜跳</b>到他的侧面。试试看——两个高亮格任选其一。',
+    setup(g) {
+      resetCustom(g, { me: { r: 6, c: 4 }, opp: { r: 5, c: 4 } });
+      g.addWall('H', 4, 4);   // 挡住 (4,4)↓，即直跳落点 (4,4) 不可行
+    },
+    highlight: g => [{ r: 5, c: 3 }, { r: 5, c: 5 }],
+    ghostWall: null,
+    validate: a => a.kind === 'move' && a.r === 5 && (a.c === 3 || a.c === 5) ? 'ok' : '点击两个侧向高亮格之一完成侧跳',
+    wantClick: 'move',
+  },
+  {
+    title: '第 5 课：墙的禁忌',
+    text: '墙不能<b>把对手的路完全堵死</b>。现在橙子上方只差一面墙就会被彻底封死——试着把它放上，看看会发生什么！',
+    setup(g) {
+      resetCustom(g, { me: { r: 8, c: 4 }, opp: { r: 4, c: 4 } });
+      // 在橙子上方搭一条只剩一个缺口的横墙带（行 3 与行 4 之间的凹槽）
+      for (let c = 0; c < 7; c++) g.addWall('H', 3, c);   // 缺口在 c=7
+    },
+    highlight: null,
+    ghostWall: g => ({ t: 'H', r: 3, c: 7, ok: false }),
+    validate: (a, g) => {
+      if (a.kind !== 'wall') return '试着在缺口处（虚影位置）放墙封死对手';
+      return 'rejected';
+    },
+    wantClick: 'wall',
+  },
+  {
+    title: '毕业啦！',
+    text: '规则全部学完！<br><br>要点回顾：<b>①</b> 每回合走子或放墙；<b>②</b> 紧贴可跳、被挡可侧跳；<b>③</b> 墙不能封死对手；<b>④</b> 墙只有 10 面，用在刀刃上。<br><br>点下方按钮退出引导，去创建房间实战吧！',
+    setup(g) { resetStandard(g); },
+    highlight: null, ghostWall: null, validate: null, wantClick: 'next',
+  },
+];
+function resetStandard(g) {
+  const n = new Quoridor();
+  Object.assign(g, { pawns: n.pawns.map(p => ({ ...p })), walls: [], blockDown: new Set(), blockRight: new Set(), wallsLeft: [10, 10], turn: 0, over: false, winner: -1, history: [], lastMove: null });
+}
+function resetCustom(g, { me, opp }) {
+  resetStandard(g);
+  g.pawns[0] = { ...me }; g.pawns[1] = { ...opp };
+}
+let tutSave = null;
+function startTutorial() {
+  tutSave = { offline: app.offline, room: app.room, es: app.es, seats: app.seats, state: app.state, role: app.role, mySide: app.mySide, mode: app.mode };
+  if (app.es) { app.es.close(); app.es = null; }
+  app.tutorial = true; app.tutStep = 0;
+  app.role = 'player'; app.mySide = 0; app.mode = 'move';
+  app.name = getName();
+  $('chatCard').style.display = 'none';
+  $('btnInvite').style.display = 'none';
+  $('connDot').style.display = 'none';
+  $('connText').textContent = '引导模式';
+  $('roomTag').textContent = '新手引导';
+  $('lobby').style.display = 'none';
+  $('game').style.display = '';
+  $('tutCard').style.display = '';
+  loadTutStep(0);
+}
+function loadTutStep(i) {
+  app.tutStep = Math.max(0, Math.min(TUT_STEPS.length - 1, i));
+  const step = TUT_STEPS[app.tutStep];
+  step.setup(app.state);
+  app.state.turn = 0; app.state.over = false;
+  $('tutStep').textContent = `第 ${app.tutStep + 1} / ${TUT_STEPS.length} 步`;
+  $('tutText').innerHTML = step.text;
+  $('tutNext').textContent = step.wantClick === 'next' ? '下一步 ▸' : '跳过这步';
+  updateEval(evalDetail(app.state).pct);
+  $('evalTag').textContent = '';
+  render();
+}
+function tutClick(r, c) {
+  const step = TUT_STEPS[app.tutStep];
+  const g = app.state;
+  // 判断点击的是移动还是墙位（教程里墙位=虚影位置）
+  const gw = step.ghostWall ? step.ghostWall(g) : null;
+  if (gw && gw.r === r && gw.c === c) {
+    const act = { kind: 'wall', t: gw.t, r, c };
+    if (!g.canPlaceWall(0, act.t, act.r, act.c)) {
+      // 第 5 课的演示：尝试封死对手 → 被公平规则拒绝 → 借此完成教学
+      toast('❌ 放墙失败：这会把对手的路完全堵死！墙棋不允许这样。');
+      playSound();
+      setTimeout(() => nextTut(), 900);
+      return;
+    }
+    g.act(0, act); playSound(); render();
+    return nextTut();
+  }
+  const act = { kind: 'move', r, c };
+  const legal = g.legalPawnMoves(0).find(m => m.r === r && m.c === c);
+  if (!legal) { render(); return toast('点发亮的格子行动'); }
+  g.act(0, act); playSound(); render();
+  const verdict = step.validate ? step.validate(act, g) : 'ok';
+  if (verdict === 'ok' || verdict === 'rejected') {
+    if (verdict === 'rejected') { toast('不是这格——再来一次'); const s2 = TUT_STEPS[app.tutStep]; s2.setup(g); app.state.over = false; render(); return; }
+    setTimeout(() => nextTut(), 500);
+  } else {
+    toast(verdict);
+    step.setup(g); render();
+  }
+}
+function nextTut() { loadTutStep(app.tutStep + 1); }
+function exitTutorial() {
+  app.tutorial = false;
+  $('tutCard').style.display = 'none';
+  if (tutSave && tutSave.es) { tutSave.es.close(); tutSave.es = null; }
+  backToLobby('');
+}
+
+/* ---------- 事件绑定 ---------- */
+function setMode(m) {
+  app.mode = m;
+  $('modeMove').classList.toggle('on', m === 'move');
+  $('modeH').classList.toggle('on', m === 'H');
+  $('modeV').classList.toggle('on', m === 'V');
+  render();
+}
+function bindUI() {
+  $('btnCreate').addEventListener('click', createRoom);
+  $('btnJoin').addEventListener('click', joinRoom);
+  $('btnLocal').addEventListener('click', startOffline);
+  $('btnTutorial').addEventListener('click', startTutorial);
+  $('roomInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  $('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') createRoom(); });
+  $('modeMove').addEventListener('click', () => setMode('move'));
+  $('modeH').addEventListener('click', () => setMode('H'));
+  $('modeV').addEventListener('click', () => setMode('V'));
+  $('chatForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const text = $('chatInput').value.trim();
+    if (!text || !app.room) return;
+    postJSON('api/chat', { room: app.room, pid: app.pid, text })
+      .then(() => { $('chatInput').value = ''; })
+      .catch(err => toast('发送失败：' + err.message));
+  });
+  const voteRematch = () => {
+    if (app.offline || app.tutorial) {
+      app.state = new Quoridor(); app.rematchVotes = [];
+      updateEval(50); $('evalTag').textContent = '';
+      $('banner').classList.remove('show'); render();
+      return;
+    }
+    postJSON('api/rematch', { room: app.room, pid: app.pid })
+      .then(() => { app.rematchVotes.push(app.mySide); render(); })
+      .catch(e => toast(e.message));
+  };
+  $('btnRematch').addEventListener('click', voteRematch);
+  $('btnBannerRematch').addEventListener('click', voteRematch);
+  $('btnResign').addEventListener('click', () => {
+    if (confirm('确定认输吗？')) postJSON('api/resign', { room: app.room, pid: app.pid }).catch(() => {});
+  });
+  $('btnHint').addEventListener('click', () => {
+    const g = app.state;
+    if (g.over) return toast('对局已结束');
+    const h = bestMoveHint(g);
+    if (!h.move) return toast('没有可行着法');
+    const a = h.move;
+    if (a.kind === 'move') {
+      const cell = cellAt(a.r, a.c);
+      cell.classList.remove('hint'); void cell.offsetWidth; cell.classList.add('hint');
+      toast(`AI 建议：走子到 ${coordQ(a.r, a.c)}`);
+    } else {
+      setMode(a.t);
+      toast(`AI 建议：在 ${coordQ(a.r, a.c)} 放${a.t === 'H' ? '横' : '竖'}墙（悬停预览后点击）`);
+    }
+  });
+  $('btnSound').addEventListener('click', () => {
+    soundOn = !soundOn;
+    localStorage.setItem('q_sound', soundOn ? '1' : '0');
+    $('btnSound').textContent = soundOn ? '🔊 落子音' : '🔇 静音';
+    if (soundOn) playSound();
+  });
+  $('btnInvite').addEventListener('click', showInvite);
+  $('btnInviteCopy').addEventListener('click', copyInvite);
+  $('btnInviteClose').addEventListener('click', () => $('inviteBox').classList.remove('show'));
+  $('btnLeave').addEventListener('click', () => {
+    if (app.tutorial) return exitTutorial();
+    sessionStorage.removeItem('q_lastroom');
+    if (app.offline) return backToLobby('');
+    if (app.room && app.pid) postJSON('api/leave', { room: app.room, pid: app.pid }).catch(() => {});
+    backToLobby('');
+  });
+  $('tutNext').addEventListener('click', () => nextTut());
+  $('tutPrev').addEventListener('click', () => loadTutStep(app.tutStep - 1));
+  $('tutExit').addEventListener('click', exitTutorial);
+  document.querySelectorAll('.emotes button').forEach(b => b.addEventListener('click', () => {
+    if (!app.room || !app.pid) return;
+    postJSON('api/chat', { room: app.room, pid: app.pid, text: b.dataset.say }).catch(() => {});
+  }));
+  window.addEventListener('error', e => {
+    const d = $('errbanner');
+    d.style.display = 'block';
+    d.textContent = '脚本错误：' + e.message;
+  });
+}
+function init() {
+  buildBoard();
+  bindUI();
+  $('nameInput').value = app.name;
+  $('btnSound').textContent = soundOn ? '🔊 落子音' : '🔇 静音';
+  const q = new URLSearchParams(location.search).get('room');
+  if (q && /^\d{4}$/.test(q)) {
+    $('roomInput').value = q;
+    if (app.name) { $('nameInput').value = app.name; joinRoom(); }
+    else $('nameInput').focus();
+    return;
+  }
+  const last = sessionStorage.getItem('q_lastroom');
+  if (last && app.name) { $('roomInput').value = last; joinRoom(); }
+}
+init();
+</script>
+</body>
+</html>
